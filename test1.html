@@ -1,0 +1,214 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <title>C4</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+    <script src="pixi.js"></script>
+</head>
+
+<body>
+    <script>
+        var now, then, delta;
+        function timestamp() {
+            return window.performance && window.performance.now ? window.performance.now() : new Date().getTime();
+        }
+
+        var ROWS = 6,
+            COLS = 7;
+        var board = null;
+
+        var width, height, piecewidth, pieceheight;
+
+        var tex = new Array(3);
+
+            var state_player = 1;
+            var state_piece_dropping = 2;
+        var state = 0;
+
+        var moverow, movecol;
+
+        var faller = null;
+
+        // create an new instance of a pixi stage with a grey background
+        var stage = new PIXI.Stage(0x888888);
+        // create a renderer instance
+        calcBoardSize();
+        var renderer = PIXI.autoDetectRenderer(width, height);
+        // create an empty container
+        var gameContainer = new PIXI.DisplayObjectContainer();
+        // add the container to the stage
+        stage.addChild(gameContainer);
+        // add the renderer view element to the DOM
+        document.body.appendChild(renderer.view);
+
+        var player = 1;
+        window.addEventListener('orientationchange', resize, false);
+        window.addEventListener('resize', resize, false);
+
+        sizePieces();
+        createBoard(7, 6);
+        setState(state_player);
+        requestAnimFrame(animate);
+
+        // width:height = 7:6
+        function calcBoardSize() {
+            height = window.innerHeight;
+            height -= height % 6;
+            width = 7 * (height / 6);
+            if (width > window.innerWidth) {
+                width = window.innerWidth;
+                width -= width % 7;
+                height = 6 * (width / 7);
+            }
+            piecewidth = pieceheight = width / 7;
+        }
+
+        function sizePieces() {
+            var texCanvas = document.createElement('canvas');
+            texCanvas.width = piecewidth;
+            texCanvas.height = pieceheight;
+            var ctx = texCanvas.getContext('2d');
+            var borderwidth = piecewidth/20;
+            var radius = (piecewidth - borderwidth) / 2;
+            ctx.beginPath();
+            ctx.arc(piecewidth/2, pieceheight/2, radius, radius, 0, 2*Math.PI, false);
+            ctx.fillStyle = 'blue';
+            ctx.fill();
+            ctx.lineWidth = piecewidth / 20;
+            ctx.strokeStyle = 'darkblue';
+            ctx.stroke();
+            tex[1] = PIXI.Texture.fromCanvas(texCanvas);
+            texCanvas = document.createElement('canvas');
+            texCanvas.width = piecewidth;
+            texCanvas.height = pieceheight;
+            ctx = texCanvas.getContext('2d');
+            ctx.beginPath();
+            ctx.arc(piecewidth/2, pieceheight/2, radius, radius, 0, 2*Math.PI, false);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.lineWidth = piecewidth / 20;
+            ctx.strokeStyle = 'darkred';
+            ctx.stroke();
+            tex[2] = PIXI.Texture.fromCanvas(texCanvas);
+            if (board !== null) {
+                for (var col = 0; col < COLS; col++) {
+                    if (board[col] !== null) {
+                        for (var row = 0; row < ROWS; row++) {
+                            var pos = board[col][row];
+                            if (pos !== null) {
+                                pos.setTexture(tex[pos.player]);
+                                pos.position.x = col * piecewidth;
+                                pos.position.y = row * pieceheight;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function resize() {
+            calcBoardSize();
+            renderer.resize(width, height);
+            sizePieces();
+        }
+        
+        function setState(newstate) {
+            switch (newstate) {
+                case state_player:
+                    canvas = document.getElementsByTagName("canvas")[0];
+                    canvas.addEventListener("mousedown", mouseDown, false);
+                    break;
+                case state_piece_dropping:
+                    canvas = document.getElementsByTagName("canvas")[0];
+                    canvas.addEventListener("mousedown", null, false);
+                    break;
+            }
+            state = newstate;
+        }
+        function animate() {
+            now = timestamp();
+            delta = now - then;
+            then = now;
+            animDroppingPiece();
+            renderer.render(stage);
+            requestAnimFrame(animate);
+        }
+
+        function mouseDown(data) {
+            switch (state) {
+                case state_player:
+                    if (canvas !== null) {
+                        var col = Math.floor((data.x - canvas.offsetLeft) / piecewidth);
+                        userMove(col);
+                    }
+                    break;
+                case state_piece_dropping:
+                    break;
+            }
+        }
+
+        function createBoard(width, height) {
+            board = new Array(width);
+            board.colcnt = new Array(width);
+            for (var col = 0; col < width; col++) {
+                board.colcnt[col] = 0;
+                board[col] = new Array(height);
+                for (var row = 0; row < height; row++) {
+                    board[col][row] = null;
+                }
+            }
+            board.width = width;
+            board.height = height;
+        }
+
+        function animDroppingPiece() {
+            if (faller !== null) {
+                faller.position.y += (faller.yspeed * delta) / 1000;
+                if (faller.position.y > faller.ystop) {
+                    faller.position.y = faller.ystop;
+                    board[movecol][moverow] = faller;
+                    faller = null;
+                    player = 3 - player;
+                    setState(state_player);
+                }
+            }
+        }
+
+        function dropPiece() {
+            setState(state_piece_dropping);
+            faller = new PIXI.Sprite(tex[player]);
+            faller.position.x = movecol * piecewidth;
+            faller.position.y = 0;
+            faller.yspeed = pieceheight * 6;
+            faller.ystop = pieceheight * moverow;
+            faller.player = player;
+            gameContainer.addChild(faller);
+            then = timestamp();
+            board.colcnt[movecol]++;
+        }
+
+        function tryToDropPiece(col) {
+            var row = -1;
+            var colcnt = board.colcnt[col];
+            if (colcnt < board.height) {
+                row = 5 - colcnt;
+                movecol = col;
+                moverow = row;
+                dropPiece();
+            }
+            return row;
+        }
+
+        function userMove(col) {
+            var row = tryToDropPiece(col);
+        }
+    </script>
+</body>
+
+</html>
