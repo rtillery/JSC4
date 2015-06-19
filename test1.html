@@ -128,11 +128,13 @@ if ('addEventListener' in document) {
             switch (newstate) {
                 case state_player:
                     canvas = document.getElementsByTagName("canvas")[0];
-                    canvas.addEventListener("mousedown", mouseDown, false);
+//                    canvas.addEventListener("mousedown", mouseDown, false);
+                    canvas.addEventListener("click", mouseDown, false);
                     break;
                 case state_piece_dropping:
                     canvas = document.getElementsByTagName("canvas")[0];
-                    canvas.addEventListener("mousedown", null, false);
+//                    canvas.addEventListener("mousedown", null, false);
+                    canvas.addEventListener("click", null, false);
                     break;
             }
             state = newstate;
