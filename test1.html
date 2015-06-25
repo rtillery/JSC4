@@ -25,11 +25,71 @@ if ('addEventListener' in document) {
             return window.performance && window.performance.now ? window.performance.now() : new Date().getTime();
         }
 
-        var ROWS = 6,
-            COLS = 7;
-        var board = null;
+var newBoard = function(rows, columns) {
+    // private members
+    // rows
+    // columns
+    var width = 0,
+        height = 0;
+    var pieceSize = {};
+    pieceSize.width = 0;
+    pieceSize.height = 0;
 
-        var width, height, piecewidth, pieceheight;
+    var obj = {
+        // width:height = columns:rows
+        calcBoardSize: function() {
+            height = window.innerHeight;
+            height -= height % rows;
+            width = columns * (height / rows);
+            if (width > window.innerWidth) {
+                width = window.innerWidth;
+                width -= width % columns;
+                height = rows * (width / columns);
+            }
+            pieceSize.width =
+            pieceSize.height = width / columns;
+        },
+        getRows: function() {
+            return rows;
+        },
+        getColumns: function() {
+            return columns;
+        },
+        getWidth: function() {
+            return width;
+        },
+        getHeight: function() {
+            return height;
+        },
+        getPieceSize: function() {
+            return pieceSize;
+        },
+        getPieceWidth: function() {
+            return pieceSize.width;
+        },
+        getPieceHeight: function() {
+            return pieceSize.height;
+        },
+        getBoard: function() {
+            return board;
+        }
+    }
+    obj.calcBoardSize();
+
+    var board = new Array(rows);
+    board.colcnt = new Array(columns);
+    for (var col = 0; col < columns; col++) {
+        board.colcnt[col] = 0;
+        board[col] = new Array(rows);
+        for (var row = 0; row < rows; row++) {
+            board[col][row] = null;
+        }
+    }
+
+    return obj;
+}
+
+var board = newBoard(6, 7);
 
         var tex = new Array(3);
 
@@ -44,8 +104,8 @@ if ('addEventListener' in document) {
         // create an new instance of a pixi stage with a grey background
         var stage = new PIXI.Stage(0x888888);
         // create a renderer instance
-        calcBoardSize();
-        var renderer = PIXI.autoDetectRenderer(width, height);
+        board.calcBoardSize();
+        var renderer = PIXI.autoDetectRenderer(board.getWidth(), board.getHeight());
         // create an empty container
         var gameContainer = new PIXI.DisplayObjectContainer();
         // add the container to the stage
@@ -57,25 +117,11 @@ if ('addEventListener' in document) {
         window.addEventListener('orientationchange', resize, false);
         window.addEventListener('resize', resize, false);
 
-        sizePieces();
-        createBoard(7, 6);
+        sizePieces(board.getPieceWidth(), board.getPieceHeight());
         setState(state_player);
         requestAnimFrame(animate);
 
-        // width:height = 7:6
-        function calcBoardSize() {
-            height = window.innerHeight;
-            height -= height % 6;
-            width = 7 * (height / 6);
-            if (width > window.innerWidth) {
-                width = window.innerWidth;
-                width -= width % 7;
-                height = 6 * (width / 7);
-            }
-            piecewidth = pieceheight = width / 7;
-        }
-
-        function sizePieces() {
+        function sizePieces(piecewidth, pieceheight) {
             var texCanvas = document.createElement('canvas');
             texCanvas.width = piecewidth;
             texCanvas.height = pieceheight;
@@ -102,11 +148,12 @@ if ('addEventListener' in document) {
             ctx.strokeStyle = 'darkred';
             ctx.stroke();
             tex[2] = PIXI.Texture.fromCanvas(texCanvas);
-            if (board !== null) {
-                for (var col = 0; col < COLS; col++) {
-                    if (board[col] !== null) {
-                        for (var row = 0; row < ROWS; row++) {
-                            var pos = board[col][row];
+            var brd = board.getBoard();
+            if (brd !== null) {
+                for (var col = 0; col < board.getColumns(); col++) {
+                    if (brd[col] !== null) {
+                        for (var row = 0; row < board.getRows(); row++) {
+                            var pos = brd[col][row];
                             if (pos !== null) {
                                 pos.setTexture(tex[pos.player]);
                                 pos.position.x = col * piecewidth;
@@ -119,21 +166,19 @@ if ('addEventListener' in document) {
         }
 
         function resize() {
-            calcBoardSize();
-            renderer.resize(width, height);
-            sizePieces();
+            board.calcBoardSize();
+            renderer.resize(board.getWidth(), board.getHeight());
+            sizePieces(board.getPieceWidth(), board.getPieceHeight());
         }
         
         function setState(newstate) {
             switch (newstate) {
                 case state_player:
                     canvas = document.getElementsByTagName("canvas")[0];
-//                    canvas.addEventListener("mousedown", mouseDown, false);
                     canvas.addEventListener("click", mouseDown, false);
                     break;
                 case state_piece_dropping:
                     canvas = document.getElementsByTagName("canvas")[0];
-//                    canvas.addEventListener("mousedown", null, false);
                     canvas.addEventListener("click", null, false);
                     break;
             }
@@ -152,7 +197,7 @@ if ('addEventListener' in document) {
             switch (state) {
                 case state_player:
                     if (canvas !== null) {
-                        var col = Math.floor((data.x - canvas.offsetLeft) / piecewidth);
+                        var col = Math.floor((data.x - canvas.offsetLeft) / board.getPieceWidth());
                         userMove(col);
                     }
                     break;
@@ -161,26 +206,13 @@ if ('addEventListener' in document) {
             }
         }
 
-        function createBoard(width, height) {
-            board = new Array(width);
-            board.colcnt = new Array(width);
-            for (var col = 0; col < width; col++) {
-                board.colcnt[col] = 0;
-                board[col] = new Array(height);
-                for (var row = 0; row < height; row++) {
-                    board[col][row] = null;
-                }
-            }
-            board.width = width;
-            board.height = height;
-        }
-
         function animDroppingPiece() {
+            var brd = board.getBoard();
             if (faller !== null) {
                 faller.position.y += (faller.yspeed * delta) / 1000;
                 if (faller.position.y > faller.ystop) {
                     faller.position.y = faller.ystop;
-                    board[movecol][moverow] = faller;
+                    brd[movecol][moverow] = faller;
                     faller = null;
                     player = 3 - player;
                     setState(state_player);
@@ -191,20 +223,20 @@ if ('addEventListener' in document) {
         function dropPiece() {
             setState(state_piece_dropping);
             faller = new PIXI.Sprite(tex[player]);
-            faller.position.x = movecol * piecewidth;
+            faller.position.x = movecol * board.getPieceWidth();
             faller.position.y = 0;
-            faller.yspeed = pieceheight * 6;
-            faller.ystop = pieceheight * moverow;
+            faller.yspeed = board.getPieceHeight() * 6;
+            faller.ystop = board.getPieceHeight() * moverow;
             faller.player = player;
             gameContainer.addChild(faller);
             then = timestamp();
-            board.colcnt[movecol]++;
+            board.getBoard().colcnt[movecol]++;
         }
 
         function tryToDropPiece(col) {
             var row = -1;
-            var colcnt = board.colcnt[col];
-            if (colcnt < board.height) {
+            var colcnt = board.getBoard().colcnt[col];
+            if (colcnt < board.getColumns()) {
                 row = 5 - colcnt;
                 movecol = col;
                 moverow = row;
